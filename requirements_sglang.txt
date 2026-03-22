@@ -17,5 +17,6 @@ torchdata
 torchvision
 transformers
 wandb
-sglang[all]==0.5.2
+# 0.5.8+ exposes ContinueGenerationReqInput / PauseGenerationReqInput in io_struct (required by verl sglang rollout)
+sglang[all]==0.5.9
 huggingface_hub

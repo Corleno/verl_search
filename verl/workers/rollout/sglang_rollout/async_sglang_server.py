@@ -57,6 +57,17 @@ logger.setLevel(logging.INFO)
 visible_devices_keyword = get_visible_devices_keyword()
 
 
+def _default_sglang_attention_backends() -> tuple[str, str]:
+    """SGLang FlashAttention v3 only supports SM 80–90; Blackwell (e.g. B200, SM100) needs flashinfer."""
+    if not torch.cuda.is_available():
+        return "fa3", "fa3"
+    major, minor = torch.cuda.get_device_capability()
+    sm = major * 10 + minor
+    if sm > 90:
+        return "flashinfer", "flashinfer"
+    return "fa3", "fa3"
+
+
 class SGLangHttpServer:
     """SGLang http server in single node, this is equivalent to launch server with command line:
     ```
@@ -161,6 +172,13 @@ class SGLangHttpServer:
 
         engine_kwargs = self.config.get("engine_kwargs", {}).get("sglang", {}) or {}
         attention_backend = engine_kwargs.pop("attention_backend", None)
+        mm_attention_backend = engine_kwargs.pop("mm_attention_backend", None)
+        default_attn, default_mm = _default_sglang_attention_backends()
+        if attention_backend is None and default_attn == "flashinfer":
+            logger.info(
+                "Using SGLang attention_backend=flashinfer (GPU SM %s; FA3 supports only SM 80–90).",
+                torch.cuda.get_device_capability(),
+            )
         quantization = self.config.get("quantization", None)
         if quantization is not None:
             if quantization == "fp8":
@@ -194,8 +212,8 @@ class SGLangHttpServer:
             "trust_remote_code": self.model_config.trust_remote_code,
             "max_running_requests": self.config.get("max_num_seqs", None),
             "log_level": "error",
-            "mm_attention_backend": "fa3",
-            "attention_backend": attention_backend if attention_backend is not None else "fa3",
+            "mm_attention_backend": mm_attention_backend if mm_attention_backend is not None else default_mm,
+            "attention_backend": attention_backend if attention_backend is not None else default_attn,
             "skip_tokenizer_init": self.config.skip_tokenizer_init,
             "skip_server_warmup": True,
             "quantization": quantization,

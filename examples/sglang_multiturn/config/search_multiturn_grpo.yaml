@@ -15,8 +15,19 @@ data:
 
 actor_rollout_ref:
   hybrid_engine: True
+
+  model:
+    # flash_attention_2 loads the flash_attn CUDA extension, which must be built for the *exact*
+    # PyTorch version in the environment (vLLM/SGLang often ship a newer torch than flash-attn wheels).
+    # sdpa uses PyTorch scaled_dot_product_attention and avoids that ABI mismatch.
+
+    override_config:
+      attn_implementation: sdpa
+
   rollout:
     name: sglang
+    # Blackwell (B200, SM100): verl auto-selects SGLang flashinfer when SM>90 (FA3 is SM 80–90 only).
+    # Override if needed: engine_kwargs.sglang.attention_backend / mm_attention_backend
     multi_turn:
       enable: True
       max_assistant_turns: 2
