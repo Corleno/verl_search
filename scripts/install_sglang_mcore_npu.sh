@@ -6,7 +6,7 @@ USE_MEGATRON=${USE_MEGATRON:-1}
 export MAX_JOBS=32
 
 echo "1. install SGLang from source"
-git clone -b v0.5.8 https://github.com/sgl-project/sglang.git
+git clone -b v0.5.9 https://github.com/sgl-project/sglang.git
 cd sglang
 mv python/pyproject_other.toml python/pyproject.toml
 pip install -e python[srt_npu]
