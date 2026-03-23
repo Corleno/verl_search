@@ -11,6 +11,7 @@ fi
 
 # W&B: default cloud (no custom host). Unset avoids the literal string "None", which breaks the client.
 unset WANDB_BASE_URL
+unset WANDB_ENTITY
 export WANDB_API_KEY="${WANDB_API_KEY_SEARCH_R1}"
 
 # set the cuda visible devices
