@@ -9,8 +9,9 @@ if [ -z "$WANDB_API_KEY_SEARCH_R1" ]; then
     exit 1
 fi
 
-# set the wandb api key
-export WANDB_API_KEY=$WANDB_API_KEY_SEARCH_R1
+# W&B: default cloud (no custom host). Unset avoids the literal string "None", which breaks the client.
+unset WANDB_BASE_URL
+export WANDB_API_KEY="${WANDB_API_KEY_SEARCH_R1}"
 
 # set the cuda visible devices
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
