@@ -3,6 +3,16 @@ set -euo pipefail
 
 mkdir -p logs
 
+# check if the wandb api key is set
+if [ -z "$WANDB_API_KEY_SEARCH_R1" ]; then
+    echo "WANDB_API_KEY_SEARCH_R1 is not set"
+    exit 1
+fi
+
+# set the wandb api key
+export WANDB_API_KEY=$WANDB_API_KEY_SEARCH_R1
+
+# set the cuda visible devices
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 EXPERIMENT_TS="$(date +%Y%m%d_%H%M%S)"
