@@ -21,9 +21,11 @@ import warnings
 from typing import Optional
 
 import datasets
-import faiss
 import numpy as np
+# Import torch before faiss: conda faiss-gpu may load an older libcudart.so.12
+# into the process first, which breaks PyTorch cu12.8+ (missing symbols at load).
 import torch
+import faiss
 import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
