@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+cd "${REPO_ROOT}"
+
 # Local dense retriever setup (see start_local_retrieval.sh).
 #
 # Run this on an NVIDIA B200 (Blackwell, sm_100) machine with a recent driver
