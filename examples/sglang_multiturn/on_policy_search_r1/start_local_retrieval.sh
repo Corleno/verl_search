@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+cd "${REPO_ROOT}"
+
 # conda activate only works in scripts after sourcing conda (non-interactive bash).
 if [[ -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]]; then
   # shellcheck source=/dev/null

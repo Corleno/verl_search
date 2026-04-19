@@ -6,11 +6,11 @@ This directory holds the on-policy Search R1 example. For search rollouts you ne
 
 ### Install
 
-From the **repository root** (the directory that contains `install_local_retrieval.sh`):
+From the **repository root**:
 
 ```bash
 cd /path/to/verl_search
-bash install_local_retrieval.sh
+bash examples/sglang_multiturn/on_policy_search_r1/install_local_retrieval.sh
 ```
 
 That script:
@@ -28,11 +28,11 @@ Both `install_local_retrieval.sh` and `start_local_retrieval.sh` use `save_path=
 After installation completes, still from the **repository root**:
 
 ```bash
-bash start_local_retrieval.sh
+bash examples/sglang_multiturn/on_policy_search_r1/start_local_retrieval.sh
 ```
 
 This activates the `retriever` Conda environment and runs `retrieval_server.py` with the E5 retriever, merged FAISS index, and decompressed corpus, with **FAISS on GPU** (`--faiss_gpu`).
 
 The FastAPI app is served by Uvicorn at **http://0.0.0.0:8000** (reachable as `http://localhost:8000` from the same machine).
 
-If Conda is missing, run `install_local_retrieval.sh` first or install Miniconda/Anaconda and create an environment that matches what `start_local_retrieval.sh` expects (`conda activate retriever`).
+If Conda is missing, run `examples/sglang_multiturn/on_policy_search_r1/install_local_retrieval.sh` first or install Miniconda/Anaconda and create an environment that matches what `start_local_retrieval.sh` expects (`conda activate retriever`).

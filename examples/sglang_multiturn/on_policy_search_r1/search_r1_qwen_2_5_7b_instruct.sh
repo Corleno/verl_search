@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+cd "${REPO_ROOT}"
+
 mkdir -p logs
 
 # check if the wandb api key is set
@@ -21,6 +25,6 @@ EXPERIMENT_TS="$(date +%Y%m%d_%H%M%S)"
 echo "Running experiment at ${EXPERIMENT_TS}"
 
 # Quote the Hydra override as one argument so it always passes through intact.
-nohup bash examples/sglang_multiturn/search_r1_like/run_qwen2.5-3b_instruct_search_multiturn.sh \
-    "trainer.experiment_name=qwen2.5-3b-it_rm-searchR1-like-sgl-multiturn-${EXPERIMENT_TS}" \
+nohup bash examples/sglang_multiturn/search_r1_like/run_qwen2.5-7b_instruct_search_multiturn.sh \
+    "trainer.experiment_name=qwen2.5-7b-it_rm-searchR1-like-sgl-multiturn-${EXPERIMENT_TS}" \
     >"logs/searchR1-like${EXPERIMENT_TS}.log" 2>&1 &
