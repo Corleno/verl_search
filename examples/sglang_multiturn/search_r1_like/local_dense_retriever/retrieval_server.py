@@ -17,13 +17,14 @@
 
 import argparse
 import json
+import os
 import warnings
 from typing import Optional
 
 import datasets
 import numpy as np
-# Import torch before faiss: conda faiss-gpu may load an older libcudart.so.12
-# into the process first, which breaks PyTorch cu12.8+ (missing symbols at load).
+# Import torch before faiss: some Faiss GPU builds load libcudart.so.12 first,
+# which can break PyTorch cu12.8+ (missing symbols at load) if the order flips.
 import torch
 import faiss
 import uvicorn
@@ -31,6 +32,17 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
+
+
+def _faiss_pypi_gpu_kernels_likely_usable() -> bool:
+    """Whether prebuilt ``faiss-gpu-cu12`` wheels are expected to include SASS for this GPU."""
+    if os.environ.get("FAISS_GPU_ALLOW_UNTESTED", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    if not torch.cuda.is_available():
+        return False
+    major, _minor = torch.cuda.get_device_capability(0)
+    # Blackwell data-center parts report (10, 0); PyPI 1.14.x wheels ship through Hopper (9.x) only.
+    return major < 10
 
 
 def load_corpus(corpus_path: str):
@@ -210,10 +222,22 @@ class DenseRetriever(BaseRetriever):
         super().__init__(config)
         self.index = faiss.read_index(self.index_path)
         if config.faiss_gpu:
-            co = faiss.GpuMultipleClonerOptions()
-            co.useFloat16 = True
-            co.shard = True
-            self.index = faiss.index_cpu_to_all_gpus(self.index, co=co)
+            if _faiss_pypi_gpu_kernels_likely_usable():
+                co = faiss.GpuMultipleClonerOptions()
+                co.useFloat16 = True
+                co.shard = True
+                self.index = faiss.index_cpu_to_all_gpus(self.index, co=co)
+            else:
+                cap = torch.cuda.get_device_capability(0)
+                name = torch.cuda.get_device_name(0)
+                warnings.warn(
+                    "FAISS GPU disabled: prebuilt faiss-gpu-cu12 wheels have no kernels for this "
+                    f"device ({name}, capability {cap}), so GPU use hits CUDA error 209. "
+                    "Keeping the index on CPU. For GPU search, build Faiss from source with your "
+                    "SM in CMAKE_CUDA_ARCHITECTURES, install it, then set FAISS_GPU_ALLOW_UNTESTED=1.",
+                    UserWarning,
+                    stacklevel=1,
+                )
 
         self.corpus = load_corpus(self.corpus_path)
         self.encoder = Encoder(
@@ -391,7 +415,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--retriever_model", type=str, default="intfloat/e5-base-v2", help="Path of the retriever model."
     )
-    parser.add_argument("--faiss_gpu", action="store_true", help="Use GPU for computation")
+    parser.add_argument(
+        "--faiss_gpu",
+        action="store_true",
+        help="Use GPU for the FAISS index when supported (Blackwell / sm_100: PyPI wheels lack kernels; server falls back to CPU unless FAISS_GPU_ALLOW_UNTESTED=1).",
+    )
 
     args = parser.parse_args()
 

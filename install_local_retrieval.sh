@@ -32,15 +32,16 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 # Install other Python packages
 pip install transformers datasets pyserini huggingface_hub
 
-# GPU FAISS: conda-forge provides CUDA 12 builds; older pytorch-channel faiss-gpu=1.8.0 targets CUDA 12.1-era stacks.
-conda install -c conda-forge faiss-gpu -y
+# GPU FAISS: conda-forge `faiss-gpu` is built against NumPy 1.x and breaks under NumPy 2 (`_ARRAY_API`).
+# Meta publishes CUDA 12 wheels as `faiss-gpu-cu12` (imports as `faiss`); pair with NumPy 2.x + SciPy 1.14+.
+# PyPI wheels do not yet ship SASS for Blackwell (compute capability 10.x); retrieval_server.py falls back to a CPU index there.
+# If you are upgrading an env that already has conda FAISS, remove it first:
+#   conda remove -y faiss-gpu faiss libfaiss
+pip install "numpy>=2.0,<2.4" "scipy>=1.14" "faiss-gpu-cu12==1.14.1.post1"
 
 # Install the API service framework
 pip install uvicorn fastapi
 
-
-# Download the Indexing and Corpus
-conda activate retriever
 
 save_path=/mnt/task_runtime/data
 python examples/sglang_multiturn/search_r1_like/local_dense_retriever/download.py --save_path $save_path
