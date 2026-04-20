@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Optional
 
 from omegaconf import MISSING
@@ -257,6 +257,10 @@ class RolloutConfig(BaseConfig):
     # Rollout skip config (load/dump rollout data)
     skip: SkipConfig = field(default_factory=SkipConfig)
 
+    # Legacy flat keys merged from older configs / checkpoints; prefer nested ``skip``.
+    skip_rollout: bool = False
+    skip_dump_dir: Optional[str] = None
+
     profiler: Optional[ProfilerConfig] = None
 
     enable_chunked_prefill: bool = True
@@ -289,6 +293,9 @@ class RolloutConfig(BaseConfig):
 
     def __post_init__(self):
         """Validate the rollout config"""
+        if self.skip_dump_dir is not None:
+            object.__setattr__(self, "skip", replace(self.skip, dump_dir=self.skip_dump_dir))
+
         # Deprecation warning for mode field - only async mode is supported
         if self.mode == "sync":
             raise ValueError(
