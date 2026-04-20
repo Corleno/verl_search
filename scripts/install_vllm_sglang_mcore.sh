@@ -60,7 +60,12 @@ else
     echo "          (2) Build from source: MAX_JOBS=8 pip install flash-attn==2.8.1 --no-build-isolation"
 fi
 
-pip install --no-cache-dir flashinfer-python==0.3.1
+# SGLang 0.5.9 depends on flashinfer_python==0.6.3 / flashinfer_cubin==0.6.3. Do not install
+# flashinfer-python==0.3.1 here: it was an older pin that runs after sglang and replaces the
+# compatible wheels, then `import sglang...` fails because 0.3.1 has no
+# `trtllm_mxint4_block_scale_moe` in `flashinfer.fused_moe` (ImportError from compressed_tensors).
+# Use --no-deps so this line does not pull a newer torch than vLLM/SGLang (see pip metadata on flashinfer-python>=0.6).
+pip install --no-cache-dir --no-deps "flashinfer-cubin==0.6.3" "flashinfer-python==0.6.3"
 
 
 if [ $USE_MEGATRON -eq 1 ]; then

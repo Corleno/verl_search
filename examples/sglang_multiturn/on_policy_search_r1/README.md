@@ -95,3 +95,35 @@ This activates the `retriever` Conda environment and runs `retrieval_server.py` 
 The FastAPI app is served by Uvicorn at **http://0.0.0.0:8000** (reachable as `http://localhost:8000` from the same machine).
 
 If Conda is missing, run `examples/sglang_multiturn/on_policy_search_r1/install_local_retrieval.sh` first or install Miniconda/Anaconda and create an environment that matches what `start_local_retrieval.sh` expects (`conda activate retriever`).
+
+## Example: on-policy Search R1 (Qwen2.5-3B-Instruct) with local retrieval
+
+The multiturn launcher uses `examples/sglang_multiturn/config/tool_config/search_tool_config.yaml`, which defaults to **`http://127.0.0.1:8000/retrieve`** — the same URL path the local dense retriever exposes when you run `start_local_retrieval.sh`. Keep that server running for the whole training job.
+
+**1. One-time setup**
+
+- **Training stack:** follow [verl Python environment](#verl-python-environment) and [Search R1 dataset (preprocess)](#search-r1-dataset-preprocess) so `train.parquet` / `test.parquet` exist (default `~/data/searchR1_processed_direct/`).
+- **Retriever:** follow [Local dense retriever](#local-dense-retriever) — run `install_local_retrieval.sh` once, then use `start_local_retrieval.sh` whenever you train.
+
+**2. Start the local retriever (leave this running)**
+
+From the **repository root**, in a dedicated shell:
+
+```bash
+cd /path/to/verl_search
+bash examples/sglang_multiturn/on_policy_search_r1/start_local_retrieval.sh
+```
+
+**3. Launch on-policy Search R1 (3B)**
+
+In another shell, from the **repository root**, activate the **`verl`** Conda environment (not `retriever`), set Weights & Biases, then run the wrapper script (it starts `run_qwen2.5-3b_instruct_search_multiturn.sh` in the background with `nohup` and logs under `logs/`):
+
+```bash
+cd /path/to/verl_search
+conda activate verl
+export WANDB_API_KEY_SEARCH_R1="<your_wandb_api_key>"
+bash examples/sglang_multiturn/on_policy_search_r1/search_r1_qwen_2_5_3b_instruct.sh
+```
+
+The script sets `CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7`; adjust the script if you use fewer GPUs. If your Parquet files are not under `~/data/searchR1_processed_direct/`, set `TRAIN_DATA` and `VAL_DATA` before running (they are read by `run_qwen2.5-3b_instruct_search_multiturn.sh`). If the retriever listens on another host or port, change `retrieval_service_url` in `examples/sglang_multiturn/config/tool_config/search_tool_config.yaml` (or supply an equivalent Hydra override) so it matches your server.
+
