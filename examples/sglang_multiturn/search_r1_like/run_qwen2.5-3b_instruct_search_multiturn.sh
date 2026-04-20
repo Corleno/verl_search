@@ -15,6 +15,7 @@ VAL_DATA="${VAL_DATA:-$HOME/data/searchR1_processed_direct/test.parquet}"
 
 TOOL_CONFIG="$CONFIG_PATH/tool_config/search_tool_config.yaml"
 
+# Check if data files exist
 for f in "$TRAIN_DATA" "$VAL_DATA"; do
     if [[ ! -f "$f" ]]; then
         echo "Missing data file: $f (set TRAIN_DATA / VAL_DATA or preprocess data)" >&2

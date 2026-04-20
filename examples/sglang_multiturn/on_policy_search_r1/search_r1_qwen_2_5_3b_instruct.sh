@@ -24,7 +24,13 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 EXPERIMENT_TS="$(date +%Y%m%d_%H%M%S)"
 echo "Running experiment at ${EXPERIMENT_TS}"
 
-# Quote the Hydra override as one argument so it always passes through intact.
+EXPERIMENT_SLUG="qwen2.5-3b-it_rm-searchR1-like-sgl-multiturn-${EXPERIMENT_TS}"
+ROLLOUT_DATA_DIR="${ROLLOUT_DATA_DIR:-${HOME}/data/searchR1_processed_direct/${EXPERIMENT_SLUG}/rollout_data}"
+mkdir -p "${ROLLOUT_DATA_DIR}"
+echo "Rollout data directory: ${ROLLOUT_DATA_DIR}"
+
+# Quote each Hydra override as one argument so they pass through intact.
 nohup bash examples/sglang_multiturn/search_r1_like/run_qwen2.5-3b_instruct_search_multiturn.sh \
-    "trainer.experiment_name=qwen2.5-3b-it_rm-searchR1-like-sgl-multiturn-${EXPERIMENT_TS}" \
-    >"logs/searchR1-like${EXPERIMENT_TS}.log" 2>&1 &
+    "trainer.experiment_name=${EXPERIMENT_SLUG}" \
+    "trainer.rollout_data_dir=${ROLLOUT_DATA_DIR}" \
+    >"logs/${EXPERIMENT_SLUG}.log" 2>&1 &
