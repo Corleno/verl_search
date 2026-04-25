@@ -127,3 +127,40 @@ bash examples/sglang_multiturn/on_policy_search_r1/search_r1_qwen_2_5_3b_instruc
 
 The script sets `CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7`; adjust the script if you use fewer GPUs. If your Parquet files are not under `~/data/searchR1_processed_direct/`, set `TRAIN_DATA` and `VAL_DATA` before running (they are read by `run_qwen2.5-3b_instruct_search_multiturn.sh`). If the retriever listens on another host or port, change `retrieval_service_url` in `examples/sglang_multiturn/config/tool_config/search_tool_config.yaml` (or supply an equivalent Hydra override) so it matches your server.
 
+## Combine rollout JSONL files
+
+Use `examples/sglang_multiturn/on_policy_search_r1/combine_rollout_jsonl.py` to merge rollout rows by the same `input` + `gts` while collecting different `output`, `score`, `step`, and `acc` values.
+
+From the repository root:
+
+```bash
+cd /path/to/verl_search
+python examples/sglang_multiturn/on_policy_search_r1/combine_rollout_jsonl.py \
+  --input-dir ~/data/searchR1_processed_direct/<experiment>/rollout_data
+```
+
+This scans `--input-dir` recursively for `*.jsonl` files and writes:
+
+- default output: `<input-dir>/combined_rollouts.jsonl`
+
+You can also pass a specific list of JSONL files. If `--jsonl-files` is provided, it takes precedence over `--input-dir`:
+
+```bash
+python examples/sglang_multiturn/on_policy_search_r1/combine_rollout_jsonl.py \
+  --jsonl-files \
+  ~/data/searchR1_processed_direct/<experiment>/rollout_data/1.jsonl \
+  ~/data/searchR1_processed_direct/<experiment>/rollout_data/5.jsonl
+```
+
+Optional custom output path:
+
+```bash
+python examples/sglang_multiturn/on_policy_search_r1/combine_rollout_jsonl.py \
+  --input-dir ~/data/searchR1_processed_direct/<experiment>/rollout_data \
+  --output-file ~/data/searchR1_processed_direct/<experiment>/combined_subset.jsonl
+```
+
+python examples/sglang_multiturn/on_policy_search_r1/combine_rollout_jsonl.py \
+  --jsonl-files \
+  ~/data/searchR1_processed_direct/qwen2.5-3b-it_rm-searchR1-like-sgl-multiturn-20260420_005250/rollout_data/1.jsonl \
+  ~/data/searchR1_processed_direct/qwen2.5-3b-it_rm-searchR1-like-sgl-multiturn-20260420_005250/rollout_data/5.jsonl
