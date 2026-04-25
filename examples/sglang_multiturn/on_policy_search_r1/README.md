@@ -163,4 +163,40 @@ python examples/sglang_multiturn/on_policy_search_r1/combine_rollout_jsonl.py \
 python examples/sglang_multiturn/on_policy_search_r1/combine_rollout_jsonl.py \
   --jsonl-files \
   ~/data/searchR1_processed_direct/qwen2.5-3b-it_rm-searchR1-like-sgl-multiturn-20260420_005250/rollout_data/1.jsonl \
-  ~/data/searchR1_processed_direct/qwen2.5-3b-it_rm-searchR1-like-sgl-multiturn-20260420_005250/rollout_data/5.jsonl
+  ~/data/searchR1_processed_direct/qwen2.5-3b-it_rm-searchR1-like-sgl-multiturn-20260420_005250/rollout_data/5.jsonl \
+  --output-file ./outputs/combined_rollouts.jsonl \
+
+## Evaluation-only script (multiple tasks/checkpoints)
+
+Use `eval_r1_qwen_2_5_3b_instruct.sh` when you want to run evaluation only (no RL training).
+The launcher loops over checkpoint/task-selector pairs and calls `examples/sglang_multiturn/on_policy_search_r1/eval.py`.
+`eval.py --task` supports:
+
+- `all` (one pass over the full validation parquet)
+- single short/full task id (`nq` or `searchR1_nq`)
+- comma list (`nq,hotpotqa,musique`)
+
+From the repository root:
+
+```bash
+cd /path/to/verl_search
+conda activate verl
+
+# Optional: override defaults from eval_r1_qwen_2_5_3b_instruct.sh.
+# Default task selector: "all" (single eval.py run per checkpoint across all data_source values in test.parquet).
+# Default checkpoint: Qwen/Qwen2.5-3B-Instruct.
+# export EVAL_TASKS="all"
+# export EVAL_TASKS="nq,hotpotqa"
+# export EVAL_CHECKPOINTS="/path/to/ckpt-100,/path/to/ckpt-200"
+
+# Optional Hydra overrides forwarded to eval.py (same as training overrides)
+# Example: validation sampling (see actor_rollout_ref.rollout.val_kwargs in rollout config)
+# export EVAL_COMMON_ARGS="actor_rollout_ref.rollout.val_kwargs.temperature=0.7 actor_rollout_ref.rollout.val_kwargs.do_sample=true"
+# Or: export EVAL_COMMON_ARGS="--extra-override data.val_batch_size=128 --extra-override trainer.nnodes=1"
+
+bash examples/sglang_multiturn/on_policy_search_r1/eval_r1_qwen_2_5_3b_instruct.sh
+
+EVAL_CHECKPOINTS=PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-3b-it-em-grpo bash examples/sglang_multiturn/on_policy_search_r1/eval_r1_qwen_2_5_3b_instruct.sh
+```
+
+The script writes one log per checkpoint: `logs/eval_r1_qwen2.5_3b_<checkpoint_slug>_<timestamp>.log` (checkpoint path or HF id is sanitized for the filename).
