@@ -15,5 +15,9 @@ else
   USE_MEGATRON=0 bash scripts/install_vllm_sglang_mcore.sh
 fi
 
+# Keep only one cv2 provider to avoid mixed opencv wheel files (python 3.12 import issues).
+python3 -m pip uninstall -y opencv-python || true
+python3 -m pip install --upgrade "opencv-python-headless==4.13.0.92"
+
 pip install --no-deps -e .
 python3 examples/data_preprocess/preprocess_search_r1_dataset.py
