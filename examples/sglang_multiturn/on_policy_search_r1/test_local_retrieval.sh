@@ -48,6 +48,51 @@ check_http_and_json() {
   [[ "${http_code}" == "200" ]] || fail "${name}: expected HTTP 200, got ${http_code}. Body: ${body}"
 
   printf '%s' "${body}" | python3 -c "${validator}" || fail "${name}: response validation failed"
+  python3 - "${payload}" "${body}" <<'PY' || fail "${name}: unable to print query outcomes"
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+response = json.loads(sys.argv[2])
+queries = payload.get("queries", [])
+results = response.get("result", [])
+
+for idx, query in enumerate(queries):
+    print(f"    Query {idx + 1}: {query}")
+    hits = results[idx] if idx < len(results) and isinstance(results[idx], list) else []
+    if not hits:
+        print("      (no outcomes)")
+        continue
+
+    for rank, hit in enumerate(hits, start=1):
+        if isinstance(hit, dict):
+            # Support both scored responses ({"document": ..., "score": ...})
+            # and raw document objects returned when return_scores=false.
+            doc_obj = hit.get("document", hit)
+            if isinstance(doc_obj, dict):
+                doc = (
+                    str(doc_obj.get("contents"))
+                    if doc_obj.get("contents")
+                    else str(doc_obj.get("text"))
+                    if doc_obj.get("text")
+                    else str(doc_obj.get("title"))
+                    if doc_obj.get("title")
+                    else ""
+                )
+            else:
+                doc = str(doc_obj)
+            doc = doc.strip().replace("\n", " ")
+            if len(doc) > 120:
+                doc = doc[:117] + "..."
+            score = hit.get("score")
+            if score is None:
+                print(f"      [{rank}] {doc}")
+            else:
+                print(f"      [{rank}] score={score:.6f} | {doc}")
+        else:
+            text = str(hit).strip().replace("\n", " ")
+            print(f"      [{rank}] {text}")
+PY
   echo "    OK"
 }
 
