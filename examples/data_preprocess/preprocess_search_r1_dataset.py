@@ -31,9 +31,10 @@ logger = logging.getLogger(__name__)
 # Configuration constants
 DEFAULT_SYSTEM_CONTENT = "You are a helpful and harmless assistant."
 DEFAULT_USER_CONTENT_PREFIX = (
-    "Answer the given question. You must conduct reasoning inside <think> and </think> "
-    "first every time you get new information. After reasoning, if you find you lack "
-    "some knowledge, you can call a search engine by <tool_call> query </tool_call> "
+    "Answer the given question. You must conduct step by step reasoning "
+    "first every time you get new information. If you need external information, "
+    "call the search tool by returning a JSON object inside <tool_call> tags. "
+    "For example: <tool_call>{\"name\": \"search\", \"arguments\": {\"query\": \"your query\"}}</tool_call>. "
     "and it will return the top searched results between <tool_response> and "
     "</tool_response>. You can search as many times as your want. If you find no "
     "further external knowledge needed, you can directly provide the answer inside "
