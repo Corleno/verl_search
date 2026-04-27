@@ -401,7 +401,7 @@ class RayPPOTrainer:
         except Exception as e:
             print(f"Warning: Could not set total_training_steps in config. Structure missing? Error: {e}")
 
-    def _dump_generations(self, inputs, outputs, gts, scores, reward_extra_infos_dict, dump_path):
+    def _dump_generations(self, inputs, outputs, gts, scores, reward_extra_infos_dict, dump_path, append: bool = False):
         """Dump rollout/validation samples as JSONL."""
         os.makedirs(dump_path, exist_ok=True)
         filename = os.path.join(dump_path, f"{self.global_steps}.jsonl")
@@ -424,10 +424,11 @@ class RayPPOTrainer:
             entry = {k: v[i] for k, v in base_data.items()}
             lines.append(json.dumps(entry, ensure_ascii=False))
 
-        with open(filename, "w") as f:
+        mode = "a" if append else "w"
+        with open(filename, mode) as f:
             f.write("\n".join(lines) + "\n")
 
-        print(f"Dumped generations to {filename}")
+        print(f"{'Appended' if append else 'Dumped'} generations to {filename}")
 
     def _log_rollout_data(
         self, batch: DataProto, reward_extra_infos_dict: dict, timing_raw: dict, rollout_data_dir: str
@@ -513,11 +514,19 @@ class RayPPOTrainer:
         data_source_lst = []
         reward_extra_infos_dict: dict[str, list] = defaultdict(list)
 
-        # Lists to collect samples for the table
-        sample_inputs = []
-        sample_outputs = []
-        sample_gts = []
-        sample_scores = []
+        # Keep only a bounded sample in-memory for validation logging.
+        generations_to_log = self.config.trainer.log_val_generations
+        log_samples: list[tuple[str, str, float]] = []
+        num_seen_samples = 0
+
+        # Stream dumps to disk batch-by-batch to avoid growing host RAM.
+        val_data_dir = self.config.trainer.get("validation_data_dir", None)
+        if val_data_dir:
+            os.makedirs(val_data_dir, exist_ok=True)
+            existing_val_dump = os.path.join(val_data_dir, f"{self.global_steps}.jsonl")
+            if os.path.exists(existing_val_dump):
+                os.remove(existing_val_dump)
+
         sample_turns = []
         sample_uids = []
 
@@ -533,11 +542,6 @@ class RayPPOTrainer:
             test_batch = test_batch.repeat(
                 repeat_times=self.config.actor_rollout_ref.rollout.val_kwargs.n, interleave=True
             )
-
-            ground_truths = [
-                item.non_tensor_batch.get("reward_model", {}).get("ground_truth", None) for item in test_batch
-            ]
-            sample_gts.extend(ground_truths)
 
             test_gen_batch = self._get_gen_batch(test_batch)
             test_gen_batch.meta_info = {
@@ -570,26 +574,15 @@ class RayPPOTrainer:
 
             print("validation generation end")
 
-            # Store generated outputs
-            output_ids = test_output_gen_batch.batch["responses"]
-            output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
-            sample_outputs.extend(output_texts)
-
             test_batch = test_batch.union(test_output_gen_batch)
             test_batch.meta_info["validate"] = True
 
-            # Store original inputs
-            input_ids = test_batch.batch["prompts"]
-            # TODO: Can we keep special tokens except for padding tokens?
-            input_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids]
-            sample_inputs.extend(input_texts)
             sample_uids.extend(test_batch.non_tensor_batch["uid"])
 
             # evaluate using reward_function
             reward_tensor, reward_extra_info = extract_reward(test_batch)
 
             scores = reward_tensor.sum(-1).cpu().tolist()
-            sample_scores.extend(scores)
 
             reward_extra_infos_dict["reward"].extend(scores)
             for key, values in reward_extra_info.items():
@@ -600,28 +593,60 @@ class RayPPOTrainer:
                 else:
                     reward_extra_infos_dict[key].extend(values if isinstance(values, list) else [values])
 
+            # Decode only when needed for logging/dump to reduce memory pressure.
+            needs_decoded_text = generations_to_log > 0 or val_data_dir
+            if needs_decoded_text:
+                output_ids = test_output_gen_batch.batch["responses"]
+                output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
+                input_ids = test_batch.batch["prompts"]
+                input_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in input_ids]
+                ground_truths = [
+                    item.non_tensor_batch.get("reward_model", {}).get("ground_truth", None) for item in test_batch
+                ]
+
+                if generations_to_log > 0:
+                    # Reservoir sample a fixed number of validation generations.
+                    for input_text, output_text, score in zip(input_texts, output_texts, scores, strict=True):
+                        num_seen_samples += 1
+                        if len(log_samples) < generations_to_log:
+                            log_samples.append((input_text, output_text, score))
+                        else:
+                            idx = np.random.randint(0, num_seen_samples)
+                            if idx < generations_to_log:
+                                log_samples[idx] = (input_text, output_text, score)
+
+                if val_data_dir:
+                    dump_reward_extra_infos_dict = {
+                        key: values.tolist() if isinstance(values, np.ndarray) else values
+                        for key, values in reward_extra_info.items()
+                    }
+                    dump_reward_extra_infos_dict["reward"] = scores
+                    self._dump_generations(
+                        inputs=input_texts,
+                        outputs=output_texts,
+                        gts=ground_truths,
+                        scores=scores,
+                        reward_extra_infos_dict=dump_reward_extra_infos_dict,
+                        dump_path=val_data_dir,
+                        append=True,
+                    )
+
             # collect num_turns of each prompt
             if "__num_turns__" in test_batch.non_tensor_batch:
                 sample_turns.append(test_batch.non_tensor_batch["__num_turns__"])
 
             data_source_lst.append(test_batch.non_tensor_batch.get("data_source", ["unknown"] * reward_tensor.shape[0]))
 
-        self._maybe_log_val_generations(inputs=sample_inputs, outputs=sample_outputs, scores=sample_scores)
-
-        # dump generations
-        val_data_dir = self.config.trainer.get("validation_data_dir", None)
-        if val_data_dir:
-            self._dump_generations(
-                inputs=sample_inputs,
-                outputs=sample_outputs,
-                gts=sample_gts,
-                scores=sample_scores,
-                reward_extra_infos_dict=reward_extra_infos_dict,
-                dump_path=val_data_dir,
-            )
+        if generations_to_log > 0:
+            log_inputs = [sample[0] for sample in log_samples]
+            log_outputs = [sample[1] for sample in log_samples]
+            log_scores = [sample[2] for sample in log_samples]
+            self._maybe_log_val_generations(inputs=log_inputs, outputs=log_outputs, scores=log_scores)
 
         for key_info, lst in reward_extra_infos_dict.items():
-            assert len(lst) == 0 or len(lst) == len(sample_scores), f"{key_info}: {len(lst)=}, {len(sample_scores)=}"
+            assert len(lst) == 0 or len(lst) == len(reward_extra_infos_dict["reward"]), (
+                f"{key_info}: {len(lst)=}, {len(reward_extra_infos_dict['reward'])=}"
+            )
 
         if merged:
             print("_merge_validation_results validate result will be merged")
